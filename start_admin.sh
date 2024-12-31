@@ -9,6 +9,7 @@ log() {
 declare -r PERSISTENT_STORAGE_BASE_DIR="/.bottlerocket/host-containers/current"
 declare -r SSH_HOST_KEY_DIR="${PERSISTENT_STORAGE_BASE_DIR}/etc/ssh"
 declare -r USER_DATA="${PERSISTENT_STORAGE_BASE_DIR}/user-data"
+declare -r HOST_CERTS="/.bottlerocket/certs"
 
 if [ ! -s "${USER_DATA}" ]; then
   log "Admin host-container user-data is empty, going to sleep forever"
@@ -34,6 +35,15 @@ declare -r SSHD_CONFIG_FILE="${SSHD_CONFIG_DIR}/sshd_config"
 # This is a counter used to verify at least
 # one of the methods below is available.
 declare -i available_ssh_methods=0
+
+# Link host certs if present into container & run update-ca-trust
+link_host_certs() {
+  for cert in $(ls -1 "${HOST_CERTS}"); do
+    ln -s "${HOST_CERTS}/${cert}" "/etc/pki/ca-trust/source/anchors/${cert}"
+  done
+  # Update the CA trust to pickup the new certificates
+  update-ca-trust
+}
 
 get_user_data_keys() {
     # Extract the keys from user-data json
@@ -216,6 +226,8 @@ done
 install_proxy_profile
 
 enable_systemd_services
+
+[[ -d "${HOST_CERTS}" ]] && link_host_certs
 
 systemd_options=()
 
